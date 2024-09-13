@@ -17,6 +17,7 @@
     "crypto": "^1.0.1",
     "elliptic": "^6.5.7",
     "fs": "^0.0.1-security",
+    "node-fetch": "^3.3.2",
     "wif": "^5.0.0"
   }
 }

