@@ -73,7 +73,7 @@ function getBitcoinAddressFromPrivateKey(privateKey) {
 // Fungsi utama untuk melakukan pencarian private key berdasarkan rentang dan address secara terbalik
 async function findPrivateKeyInReverseRange(startPrivateKey, userAddress) {
     let start = new BigNumber(startPrivateKey, 16);
-    let max = new BigNumber('0000000000000000000000000000000000000000000000000000000000000001', 16);
+    let max = new BigNumber('ffffffffffffffffff0000000000000000000000000000000000000000000001', 16);
 
     for (let i = start; i.isGreaterThanOrEqualTo(max); i = i.minus(1)) {
         let privateKey = i.toString(16);
@@ -108,7 +108,7 @@ async function findPrivateKeyInReverseRange(startPrivateKey, userAddress) {
 }
 
 // Contoh penggunaan
-const startPrivateKey = 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140'; // Ganti dengan private key awal
+const startPrivateKey = 'fffffffffffffff00000000000000000ebaaedce6af48a03bbfd25e8cd0364140'; // Ganti dengan private key awal
 const userAddress = '1AC4fMwgY8j9onSbXEWeH6Zan8QGMSdmtA';  // Ganti dengan Bitcoin address target
 
 await findPrivateKeyInReverseRange(startPrivateKey, userAddress);
