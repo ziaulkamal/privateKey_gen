@@ -10,8 +10,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "axios": "^1.7.7",
     "bignumber.js": "^9.1.2",
-    "bitcoinjs-lib": "^7.0.0-rc.0",
+    "bitcoinjs-lib": "^4.0.5",
     "bs58": "^6.0.0",
     "bs58check": "^4.0.0",
     "crypto": "^1.0.1",
