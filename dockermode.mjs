@@ -120,7 +120,7 @@ async function bruteForce() {
 // Jika proses utama (master)
 if (cluster.isMaster) {
     let numCPUs = cpus().length;
-    numCPUs = 19;
+    numCPUs = 19; 
     let screen = blessed.screen({ smartCSR: true });
     let boxes = [];
     let startTime = Date.now();
@@ -129,21 +129,29 @@ if (cluster.isMaster) {
     // Kirim pesan ke Telegram bahwa proses sudah dimulai dengan jumlah address yang dimuat
     sendTelegramMessage(`Script berjalan dengan ${addresses.size} address.`);
 
+    // Hitung jumlah box per kolom
+    const numBoxesPerColumn = Math.ceil(numCPUs / 2);
+
     // Box untuk setiap worker
     for (let i = 0; i < numCPUs; i++) {
+        let col = i < numBoxesPerColumn ? 0 : 1;
+        let row = i < numBoxesPerColumn ? i : i - numBoxesPerColumn;
+
         let box = blessed.box({
-            top: `${20 + i * 80 / numCPUs}%`,
-            left: 0,
-            width: '100%',
-            height: `${80 / numCPUs}%`,
+            top: `${row * (100 / numBoxesPerColumn)}%`,
+            left: `${col * 50}%`,
+            width: '50%',
+            height: `${100 / numBoxesPerColumn}%`,
             content: `Worker ${i + 1} Keys generated: 0\nSpeed: 0 keys/min`,
             border: { type: 'line' },
             style: { fg: 'green', border: { fg: 'green' }, font: 'monospace' }
         });
         screen.append(box);
-        screen.render(); // Render setelah setiap box ditambahkan
         boxes.push(box);
     }
+
+    // Render layar
+    screen.render();
 
     // Jalankan fork untuk setiap CPU
     for (let i = 0; i < numCPUs; i++) {
