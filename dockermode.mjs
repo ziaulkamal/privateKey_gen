@@ -130,18 +130,18 @@ if (cluster.isMaster) {
     // Kirim pesan ke Telegram bahwa proses sudah dimulai dengan jumlah address yang dimuat
     sendTelegramMessage(`Script berjalan dengan ${addresses.size} address.`);
 
-    // Info box untuk keterangan utama
-    let infoBox = blessed.box({
-        top: '0%',
-        left: 0,
-        width: '100%',
-        height: '20%',
-        content: `Brute-forcing Bitcoin addresses...`,
-        border: { type: 'line' },
-        style: { fg: 'green', border: { fg: 'green' } }
-    });
-    screen.append(infoBox);
-    screen.render(); // Render setelah append
+    // // Info box untuk keterangan utama
+    // let infoBox = blessed.box({
+    //     top: '0%',
+    //     left: 0,
+    //     width: '100%',
+    //     height: '20%',
+    //     content: `Brute-forcing Bitcoin addresses...`,
+    //     border: { type: 'line' },
+    //     style: { fg: 'green', border: { fg: 'green' } }
+    // });
+    // screen.append(infoBox);
+    // screen.render(); // Render setelah append
 
     // Box untuk setiap worker
     for (let i = 0; i < numCPUs; i++) {
