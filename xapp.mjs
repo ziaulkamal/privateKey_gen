@@ -7,14 +7,12 @@ import fs from 'fs';
 import fetch from 'node-fetch';
 import blessed from 'blessed';
 
-let numCPUs = cpus().length; // Jumlah CPU yang tersedia
+let numCPUs = cpus().length;
 numCPUs = 20; // Ubah sesuai kebutuhan
 
-// Konstanta Telegram
 const TELEGRAM_TOKEN = '6789484876:AAFR1OQRssKGrk8aIF0jAn0zB3eWF33XtrE';
 const TELEGRAM_CHAT_ID = '-4562112556';
 
-// Fungsi untuk mengirim pesan ke Telegram
 async function sendTelegramMessage(message) {
     const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
     const body = JSON.stringify({
@@ -37,15 +35,12 @@ async function sendTelegramMessage(message) {
     }
 }
 
-// Ambil elliptic dan buat instance EC
 const EC = elliptic.ec;
 const ecCurve = new EC('secp256k1');
 
-// Variabel untuk menyimpan status global
 let totalGenerated = 0;
 const status = Array(numCPUs).fill({ total: 0, startTime: Date.now(), keysGenerated: 0, speed: 0 });
 
-// Fungsi untuk mengonversi private key dari format hexadecimal ke WIF
 function convertPrivateKeyToWIF(privateKeyHex) {
     const privateKeyBuffer = Buffer.from(privateKeyHex, 'hex');
     const version = 0x80;
@@ -55,10 +50,9 @@ function convertPrivateKeyToWIF(privateKeyHex) {
     return bs58check.encode(keyWithChecksum);
 }
 
-// Fungsi untuk menghitung Bitcoin address dari private key
 function getBitcoinAddressFromPrivateKey(privateKey) {
     const keyPair = ecCurve.keyFromPrivate(privateKey, 'hex');
-    const publicKey = keyPair.getPublic(true, 'hex'); // Mendapatkan public key dalam format compressed
+    const publicKey = keyPair.getPublic(true, 'hex');
 
     const publicKeyBuffer = Buffer.from(publicKey, 'hex');
     const publicKeyHash = crypto.createHash('sha256').update(publicKeyBuffer).digest();
@@ -74,20 +68,17 @@ function getBitcoinAddressFromPrivateKey(privateKey) {
     return bs58check.encode(fullAddress);
 }
 
-// Fungsi untuk menghasilkan private key acak
 function generateRandomPrivateKey() {
-    return crypto.randomBytes(32).toString('hex'); // 32 bytes untuk private key 256-bit
+    return crypto.randomBytes(32).toString('hex');
 }
 
-// Fungsi worker untuk mencari private key secara acak
 function workerFunction(workerId, userAddress) {
     let localGenerated = 0;
     const localStartTime = Date.now();
 
-    // Interval untuk mengirim informasi ke master
     const intervalId = setInterval(() => {
-        const elapsed = (Date.now() - localStartTime) / 1000; // dalam detik
-        const speed = localGenerated / (elapsed / 60); // keys per menit
+        const elapsed = (Date.now() - localStartTime) / 1000;
+        const speed = localGenerated / (elapsed / 60);
         process.send({ id: workerId, count: localGenerated, speed: speed });
     }, 1000);
 
@@ -99,7 +90,6 @@ function workerFunction(workerId, userAddress) {
 
             localGenerated++;
 
-            // Cek apakah address yang dihasilkan cocok dengan address target
             if (bitcoinAddress === userAddress) {
                 console.log(`Worker ${workerId}: Address cocok ditemukan!`);
                 console.log(`[+] Private Key: ${privateKey}`);
@@ -107,12 +97,11 @@ function workerFunction(workerId, userAddress) {
                 console.log(`[+] Bitcoin Address: ${bitcoinAddress}`);
                 fs.appendFileSync('recovered.txt', `Private Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nAddress: ${bitcoinAddress}\n\n`);
                 
-                // Kirim hasil ke Telegram
                 const message = `Address cocok ditemukan!\nPrivate Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nBitcoin Address: ${bitcoinAddress}`;
                 sendTelegramMessage(message);
 
-                clearInterval(intervalId); // Hentikan interval jika ditemukan
-                process.exit(0); // Hentikan worker jika ditemukan
+                clearInterval(intervalId);
+                process.exit(0);
             }
         } catch (error) {
             console.error(`Worker ${workerId} error:`, error);
@@ -120,39 +109,34 @@ function workerFunction(workerId, userAddress) {
     }
 }
 
-// Fungsi untuk mengupdate log status
 function updateStatus(boxes) {
     const now = Date.now();
-
     boxes.forEach((box, i) => {
         const workerStatus = status[i] || { keysGenerated: 0, speed: 0 };
         box.setContent(`Worker ${i + 1}\nKeys generated: ${workerStatus.keysGenerated}\nSpeed: ${workerStatus.speed.toFixed(2)} keys/min`);
     });
 
-    const totalElapsed = (now - status[0].startTime) / 1000; // dalam detik
-    const totalSpeed = totalGenerated / (totalElapsed / 60); // keys per menit
+    const totalElapsed = (now - status[0].startTime) / 1000;
+    const totalSpeed = totalGenerated / (totalElapsed / 60);
     const totalStatusBox = boxes[boxes.length - 1];
     totalStatusBox.setContent(`Total Generate: ${totalGenerated}\nOverall Speed: ${totalSpeed.toFixed(2)}/min`);
 
-    boxes[0].screen.render(); // Render the screen to show updated content
+    boxes[0].screen.render();
 }
 
-// Main function
 if (cluster.isMaster) {
     console.log(`Master ${process.pid} is running`);
     console.log(`Starting ${numCPUs} workers`);
 
-    // Setup blessed screen
     const screen = blessed.screen({
         smartCSR: true,
         title: 'Private Key Generator Status'
     });
 
-    // Hitung jumlah kolom dan baris
     const numColumns = 5;
     const numRows = Math.ceil(numCPUs / numColumns);
-    const boxWidth = Math.floor(100 / numColumns); // Persentase lebar box
-    const boxHeight = Math.floor(100 / numRows); // Persentase tinggi box
+    const boxWidth = Math.floor(100 / numColumns);
+    const boxHeight = Math.floor(100 / numRows);
 
     const boxes = [];
     for (let i = 0; i < numCPUs; i++) {
@@ -189,7 +173,6 @@ if (cluster.isMaster) {
         boxes.push(box);
     }
 
-    // Tambahkan box untuk status total di akhir
     const totalStatusBox = blessed.box({
         top: `${(numRows - 1) * boxHeight}%`,
         left: '0%',
@@ -216,7 +199,6 @@ if (cluster.isMaster) {
     screen.append(totalStatusBox);
     boxes.push(totalStatusBox);
 
-    // Start workers
     for (let i = 0; i < numCPUs; i++) {
         const worker = cluster.fork();
         worker.on('message', (message) => {
@@ -229,9 +211,8 @@ if (cluster.isMaster) {
         });
     }
 
-    const userAddress = '1AC4fMwgY8j9onSbXEWeH6Zan8QGMSdmtA';  // Ganti dengan Bitcoin address target
+    const userAddress = '1AC4fMwgY8j9onSbXEWeH6Zan8QGMSdmtA';
 
-    // Setup interval untuk update log status
     setInterval(() => updateStatus(boxes), 1000);
 
     screen.key(['escape', 'q', 'C-c'], function(ch, key) {
@@ -248,6 +229,6 @@ if (cluster.isMaster) {
         console.log(`Worker ${worker.process.pid} forked`);
     });
 } else {
-    const userAddress = '1AC4fMwgY8j9onSbXEWeH6Zan8QGMSdmtA';  // Ganti dengan Bitcoin address target
-    workerFunction(cluster.worker.id - 1, userAddress); // cluster.worker.id dimulai dari 1
+    const userAddress = '1AC4fMwgY8j9onSbXEWeH6Zan8QGMSdmtA';
+    workerFunction(cluster.worker.id - 1, userAddress);
 }
