@@ -1,17 +1,11 @@
 import cluster from 'node:cluster';
-import os from 'node:os';
+import { cpus } from 'node:os';
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import crypto from 'crypto';
 import bs58check from 'bs58check';
 import elliptic from 'elliptic';
 import fs from 'fs';
 import fetch from 'node-fetch';
-import blessed from 'blessed';
-import path from 'path';
-import url from 'node:url';
-
-// Mendapatkan jalur file saat ini
-const __filename = url.fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Konstanta Telegram
 const TELEGRAM_TOKEN = '6789484876:AAFR1OQRssKGrk8aIF0jAn0zB3eWF33XtrE';
@@ -40,6 +34,10 @@ async function sendTelegramMessage(message) {
     }
 }
 
+// Ambil elliptic dan buat instance EC
+const EC = elliptic.ec;
+const ecCurve = new EC('secp256k1');
+
 // Fungsi untuk mengonversi private key dari format hexadecimal ke WIF
 function convertPrivateKeyToWIF(privateKeyHex) {
     const privateKeyBuffer = Buffer.from(privateKeyHex, 'hex');
@@ -52,137 +50,105 @@ function convertPrivateKeyToWIF(privateKeyHex) {
 
 // Fungsi untuk menghitung Bitcoin address dari private key
 function getBitcoinAddressFromPrivateKey(privateKey) {
-    const EC = elliptic.ec;
-    const ecCurve = new EC('secp256k1');
     const keyPair = ecCurve.keyFromPrivate(privateKey, 'hex');
-    const publicKey = keyPair.getPublic(true, 'hex');
+    const publicKey = keyPair.getPublic().encode('hex');
+
     const publicKeyBuffer = Buffer.from(publicKey, 'hex');
     const publicKeyHash = crypto.createHash('sha256').update(publicKeyBuffer).digest();
     const ripemd160Hash = crypto.createHash('ripemd160').update(publicKeyHash).digest();
+
     const addy = Buffer.alloc(21);
     addy.writeUInt8(0x00, 0);
     ripemd160Hash.copy(addy, 1);
+
     const checksum = crypto.createHash('sha256').update(crypto.createHash('sha256').update(addy).digest()).digest();
     const fullAddress = Buffer.concat([addy, checksum.slice(0, 4)]);
+
     return bs58check.encode(fullAddress);
 }
 
-// Fungsi untuk menghasilkan private key acak
-function generateRandomPrivateKey() {
-    return crypto.randomBytes(32).toString('hex'); // 32 bytes untuk private key 256-bit
-}
-
-// Fungsi utama untuk melakukan pencarian private key secara acak
+// Fungsi utama untuk mencari private key secara acak
 async function findPrivateKeyRandomly(userAddress) {
-    let keysGenerated = 0;
-    let startTime = Date.now();
+    let count = 0;
+    let start = Date.now();
 
     while (true) {
-        try {
-            // Menghasilkan private key acak
-            const privateKey = generateRandomPrivateKey();
-            // Mendapatkan Bitcoin address dari private key
-            const bitcoinAddress = getBitcoinAddressFromPrivateKey(privateKey);
-            const privateKeyWIF = convertPrivateKeyToWIF(privateKey);
+        const privateKey = crypto.randomBytes(32).toString('hex');
+        const bitcoinAddress = getBitcoinAddressFromPrivateKey(privateKey);
+        const privateKeyWIF = convertPrivateKeyToWIF(privateKey);
 
-            keysGenerated++;
+        count++;
+        const elapsed = (Date.now() - start) / 1000; // elapsed time in seconds
+        const speed = count / (elapsed || 1); // speed in keys per second
 
-            // Cek apakah address yang dihasilkan cocok dengan address target
-            if (bitcoinAddress === userAddress) {
-                console.log("====================================================================================");
-                console.log(`Address cocok ditemukan!`);
-                console.log(`[+] Private Key: ${privateKey}`);
-                console.log(`[+] Private Key (WIF): ${privateKeyWIF}`);
-                console.log(`[+] Bitcoin Address: ${bitcoinAddress}`);
-                // fs.appendFileSync('recovered.txt', `Private Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nAddress: ${bitcoinAddress}\n\n`);
-                
-                // Kirim hasil ke Telegram
-                const message = `Address cocok ditemukan!\nPrivate Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nBitcoin Address: ${bitcoinAddress}`;
-                await sendTelegramMessage(message);
+        if (bitcoinAddress === userAddress) {
+            console.log(`Found address match!`);
+            console.log(`Private Key: ${privateKey}`);
+            console.log(`Private Key (WIF): ${privateKeyWIF}`);
+            console.log(`Bitcoin Address: ${bitcoinAddress}`);
+            fs.appendFileSync('recovered.txt', `Private Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nAddress: ${bitcoinAddress}\n\n`);
+            
+            // Kirim hasil ke Telegram
+            const message = `Address match found!\nPrivate Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nBitcoin Address: ${bitcoinAddress}`;
+            await sendTelegramMessage(message);
 
-                return; // Hentikan jika ditemukan
+            // Kirim status ke master
+            if (parentPort) {
+                parentPort.postMessage({ type: 'found', privateKey, privateKeyWIF, bitcoinAddress });
             }
 
-            // Update status ke master
-            const currentTime = Date.now();
-            const elapsedTime = (currentTime - startTime) / 1000; // detik
-            const speed = keysGenerated / elapsedTime;
-            process.send({ type: 'status', id: cluster.worker.id - 1, count: keysGenerated, speed: speed });
-            
-        } catch (error) {
-            console.error('Error:', error);
+            break; // Hentikan jika ditemukan
+        }
+
+        // Kirim status ke master
+        if (parentPort) {
+            parentPort.postMessage({ type: 'status', id: workerData.id, count, speed });
         }
     }
 }
 
-if (cluster.isMaster) {
-    // Master Process
-    let numCPUs = os.cpus().length;
-    numCPUs = 17;
-    // Set up blessed screen
-    const screen = blessed.screen({
-        smartCSR: true
-    });
+if (isMainThread) {
+    let numCPUs = cpus().length;
+    // numCPUs = ;
+    const workers = [];
+    const statuses = Array(numCPUs).fill({ count: 0, speed: 0 });
 
-    // Create a box for each CPU
-    const boxes = [];
+    console.log(`Master ${process.pid} is running`);
+
+    // Fork workers
     for (let i = 0; i < numCPUs; i++) {
-        boxes[i] = blessed.box({
-            top: i * 2,
-            left: 0,
-            width: '100%',
-            height: 1,
-            content: `CPU ${i + 1}: Total Generate: 0, Speed: 0.00/sec`,
-            tags: true,
-            style: {
-                fg: 'white',
-                bg: 'black',
-                border: {
-                    fg: 'blue'
-                }
+        const worker = new Worker(new URL(import.meta.url), { workerData: { id: i } });
+        workers.push(worker);
+
+        worker.on('message', (message) => {
+            if (message.type === 'status') {
+                const { id, count, speed } = message;
+                statuses[id] = { count, speed };
+
+                // Update display
+                const statusLines = statuses.map((status, index) => 
+                    `CPU ${index + 1}: Total Generate: ${status.count}, Speed: ${status.speed.toFixed(2)}/sec`
+                ).join(' | ');
+                process.stdout.write(`\r${statusLines}`);
+            }
+
+            if (message.type === 'found') {
+                console.log(`\nAddress match found!`, message);
             }
         });
-        screen.append(boxes[i]);
-    }
 
-    // Create worker processes
-    for (let i = 0; i < numCPUs; i++) {
-        cluster.fork();
-    }
+        worker.on('error', (error) => {
+            console.error(`Worker ${i} error:`, error);
+        });
 
-    cluster.on('message', (worker, message) => {
-        if (message.type === 'status') {
-            const { id, count, speed } = message;
-            boxes[id].setContent(`CPU ${id + 1}: Total Generate: ${count}, Speed: ${speed.toFixed(2)}/sec`);
-            screen.render();
-        }
-
-        if (message.type === 'found') {
-            console.log("====================================================================================");
-            console.log(`Address cocok ditemukan!`);
-            console.log(`[+] Private Key: ${message.privateKey}`);
-            console.log(`[+] Private Key (WIF): ${message.privateKeyWIF}`);
-            console.log(`[+] Bitcoin Address: ${message.bitcoinAddress}`);
-            fs.appendFileSync('recovered.txt', `Private Key: ${message.privateKey}\nPrivate Key (WIF): ${message.privateKeyWIF}\nAddress: ${message.bitcoinAddress}\n\n`);
-            
-            // Kirim hasil ke Telegram
-            const msg = `Address cocok ditemukan!\nPrivate Key: ${message.privateKey}\nPrivate Key (WIF): ${message.privateKeyWIF}\nBitcoin Address: ${message.bitcoinAddress}`;
-            sendTelegramMessage(msg).catch(console.error);
-            
-            // Kill all workers
-            for (const id in cluster.workers) {
-                cluster.workers[id].kill();
+        worker.on('exit', (code) => {
+            if (code !== 0) {
+                console.error(`Worker ${i} exited with code ${code}`);
             }
-        }
-    });
-
-    cluster.on('exit', (worker, code, signal) => {
-        console.log(`Worker ${worker.process.pid} died`);
-    });
+        });
+    }
 
 } else {
-    // Worker Process
-    const userAddress = '1AC4fMwgY8j9onSbXEWeH6Zan8QGMSdmtA'; // Ganti dengan Bitcoin address target
-
-    findPrivateKeyRandomly(userAddress).catch(console.error);
+    // Worker thread
+    findPrivateKeyRandomly('1AC4fMwgY8j9onSbXEWeH6Zan8QGMSdmtA').catch(console.error);
 }
