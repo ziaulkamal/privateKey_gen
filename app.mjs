@@ -117,8 +117,8 @@ async function findPrivateKeyRandomly(userAddress) {
 
 if (cluster.isMaster) {
     // Master Process
-    const numCPUs = os.cpus().length;
-
+    let numCPUs = os.cpus().length;
+    numCPUs = 17;
     // Set up blessed screen
     const screen = blessed.screen({
         smartCSR: true
