@@ -121,7 +121,7 @@ async function bruteForce() {
 // Jika proses utama (master)
 if (cluster.isMaster) {
     let numCPUs = cpus().length;
-    numCPUs = 4;
+    numCPUs = 19;
     let screen = blessed.screen({ smartCSR: true });
     let boxes = [];
     let startTime = Date.now();
