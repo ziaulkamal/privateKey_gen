@@ -25,7 +25,6 @@ try {
             addresses.add(address.trim());
         }
     });
-    // console.log(`${addresses.size} Bitcoin addresses loaded.`);
 } catch (error) {
     console.error(`Error loading address data from ${dataFilePath}:`, error);
     process.exit(1);
@@ -130,19 +129,6 @@ if (cluster.isMaster) {
     // Kirim pesan ke Telegram bahwa proses sudah dimulai dengan jumlah address yang dimuat
     sendTelegramMessage(`Script berjalan dengan ${addresses.size} address.`);
 
-    // // Info box untuk keterangan utama
-    // let infoBox = blessed.box({
-    //     top: '0%',
-    //     left: 0,
-    //     width: '100%',
-    //     height: '20%',
-    //     content: `Brute-forcing Bitcoin addresses...`,
-    //     border: { type: 'line' },
-    //     style: { fg: 'green', border: { fg: 'green' } }
-    // });
-    // screen.append(infoBox);
-    // screen.render(); // Render setelah append
-
     // Box untuk setiap worker
     for (let i = 0; i < numCPUs; i++) {
         let box = blessed.box({
@@ -150,7 +136,7 @@ if (cluster.isMaster) {
             left: 0,
             width: '100%',
             height: `${80 / numCPUs}%`,
-            content: `Worker ${i + 1} Keys generated: 0`,
+            content: `Worker ${i + 1} Keys generated: 0\nSpeed: 0 keys/min`,
             border: { type: 'line' },
             style: { fg: 'green', border: { fg: 'green' }, font: 'monospace' }
         });
