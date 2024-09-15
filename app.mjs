@@ -108,7 +108,7 @@ async function findPrivateKeyRandomly(userAddress) {
 
 if (isMainThread) {
     let numCPUs = cpus().length;
-    numCPUs = 5;
+    numCPUs = 10;
     const workers = [];
     const statuses = Array(numCPUs).fill({ count: 0, speed: 0 });
 
