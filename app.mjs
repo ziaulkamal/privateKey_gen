@@ -126,8 +126,8 @@ if (isMainThread) {
 
                 // Update display
                 const statusLines = statuses.map((status, index) => 
-                    `${index + 1}: status: ${status.count} /${status.speed.toFixed(2)}/sec`
-                ).join(' | ');
+                    `${index + 1}:status:${status.count}/${status.speed.toFixed(2)}/sec`
+                ).join('|');
                 process.stdout.write(`\r${statusLines}`);
             }
 
