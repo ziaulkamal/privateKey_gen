@@ -86,7 +86,6 @@ async function findPrivateKeyRandomly(userAddress) {
             console.log(`Private Key: ${privateKey}`);
             console.log(`Private Key (WIF): ${privateKeyWIF}`);
             console.log(`Bitcoin Address: ${bitcoinAddress}`);
-            // fs.appendFileSync('recovered.txt', `Private Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nAddress: ${bitcoinAddress}\n\n`);
             
             // Kirim hasil ke Telegram
             const message = `Address match found!\nPrivate Key: ${privateKey}\nPrivate Key (WIF): ${privateKeyWIF}\nBitcoin Address: ${bitcoinAddress}`;
@@ -109,7 +108,7 @@ async function findPrivateKeyRandomly(userAddress) {
 
 if (isMainThread) {
     let numCPUs = cpus().length;
-    numCPUs = 8;
+    numCPUs = 5;
     const workers = [];
     const statuses = Array(numCPUs).fill({ count: 0, speed: 0 });
 
@@ -127,7 +126,7 @@ if (isMainThread) {
 
                 // Update display
                 const statusLines = statuses.map((status, index) => 
-                    `CPU ${index + 1}: Generate: ${status.count}, Speed: ${status.speed.toFixed(2)}/sec`
+                    `${index + 1}: status: ${status.count} /${status.speed.toFixed(2)}/sec`
                 ).join(' | ');
                 process.stdout.write(`\r${statusLines}`);
             }
